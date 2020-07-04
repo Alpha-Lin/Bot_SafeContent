@@ -5,10 +5,10 @@ const https = require('https');
 const http = require('http')
 const client = new Discord.Client();
 
-let blacklist = JSON.parse(fs.readFileSync("blacklist_pictures.json"))
+const blacklist = JSON.parse(fs.readFileSync("blacklist_pictures.json"))
 
 function urlify(url){//analyse toutes les URLs
-    res = []
+    const res = []
     url.replace(/(https?:\/\/[^\s]+)/g, function(url){
         res.push(url)
     })
