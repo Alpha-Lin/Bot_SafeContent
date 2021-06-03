@@ -7,6 +7,11 @@ const client = new Discord.Client();
 
 const blacklist = JSON.parse(fs.readFileSync("blacklist_pictures.json"))
 
+client.on('guildCreate', guild => {
+    blacklist[guild.id] = {"URL":[],"hash":[],"max_size":0}
+    fs.writeFileSync('blacklist_pictures.json', JSON.stringify(blacklist))
+})
+
 function urlify(url){//analyse toutes les URLs
     const res = []
     url.replace(/(https?:\/\/[^\s]+)/g, function(url){
@@ -16,16 +21,17 @@ function urlify(url){//analyse toutes les URLs
 }
 
 client.on('message', message => {
-    if(blacklist["URL"].includes(...urlify(message.content))){//check 1 : URLs
+    const serverID = message.guild.id
+    if(blacklist[serverID]["URL"].includes(...urlify(message.content))){//check 1 : URLs
         message.delete()
     }
     else{//check 2 : hash /*for..on*/
-        if(message.attachments.size > 0 && message.attachments.size <= blacklist["max_size"]){//vérifie que la taille n'est pas supérieure à celle du plus gros fichier afin de ne pas le télécharger
+        if(message.attachments.size > 0 && message.attachments.size <= blacklist[serverID]["max_size"]){//vérifie que la taille n'est pas supérieure à celle du plus gros fichier afin de ne pas le télécharger
             https.get(message.attachments.first().url, function(response) {//téléchargement du fichier
                 response.pipe(crypto.createHash('whirlpool').setEncoding('hex')).on('finish', function () {//calcul du hash
-                    if(blacklist["hash"].includes(this.read())){
-                        if(!blacklist["URL"].includes(message.attachments.first().url)){//ajout de l'URL si elle n'est pas répertoriée
-                            blacklist["URL"].push(message.attachments.first().url)
+                    if(blacklist[serverID]["hash"].includes(this.read())){
+                        if(!blacklist[serverID]["URL"].includes(message.attachments.first().url)){//ajout de l'URL si elle n'est pas répertoriée
+                            blacklist[serverID]["URL"].push(message.attachments.first().url)
                             fs.writeFileSync('blacklist_pictures.json', JSON.stringify(blacklist))
                         }
                         message.delete()
@@ -40,12 +46,12 @@ client.on('message', message => {
 function addToBlacklist(url, message, response){//ajout à la blacklist
     response.pipe(crypto.createHash('whirlpool').setEncoding('hex')).on('finish', function () {
         const hash = this.read()
-        if(!blacklist['hash'].includes(hash))
-            blacklist['hash'].push(hash)
-        if(!blacklist['URL'].includes(url))
-            blacklist['URL'].push(url)
-        if(blacklist['max_size'] < response.headers['content-length'])
-            blacklist['max_size'] = Number(response.headers['content-length'])
+        if(!blacklist[message.guild.id]['hash'].includes(hash))
+            blacklist[message.guild.id]['hash'].push(hash)
+        if(!blacklist[message.guild.id]['URL'].includes(url))
+            blacklist[message.guild.id]['URL'].push(url)
+        if(blacklist[message.guild.id]['max_size'] < response.headers['content-length'])
+            blacklist[message.guild.id]['max_size'] = Number(response.headers['content-length'])
         message.delete()
         fs.writeFileSync('blacklist_pictures.json', JSON.stringify(blacklist))
     })
@@ -64,8 +70,8 @@ function downloadFile(url, message){//télécharge l'attachment
     }
 }
 
-client.on('messageReactionAdd', (reaction, user) => {
-    if("260425539427368961" === user.id && reaction.emoji.name === "❌"){
+client.on('messageReactionAdd', reaction => {
+    if(reaction.message.member.hasPermission("MANAGE_MESSAGES") && reaction.emoji.name === "❌"){
         //ajout 1 : URLs
         urlify(reaction.message.content).forEach(url => {
             downloadFile(url, reaction.message)
