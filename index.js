@@ -7,9 +7,13 @@ const client = new Discord.Client();
 
 const blacklist = JSON.parse(fs.readFileSync("blacklist_pictures.json"))
 
-client.on('guildCreate', guild => {
-    blacklist[guild.id] = {"URL":[],"hash":[],"max_size":0}
+function createEntryServer(servID){
+    blacklist[servID] = {"URL":[],"hash":[],"max_size":0}
     fs.writeFileSync('blacklist_pictures.json', JSON.stringify(blacklist))
+}
+
+client.on('guildCreate', guild => {
+    createEntryServer(guild.id)
 })
 
 function urlify(url){//analyse toutes les URLs
@@ -22,6 +26,11 @@ function urlify(url){//analyse toutes les URLs
 
 client.on('message', message => {
     const serverID = message.guild.id
+    
+    if(!(serverID in blacklist)){
+        createEntryServer(serverID)
+    }
+
     if(blacklist[serverID]["URL"].includes(...urlify(message.content))){//check 1 : URLs
         message.delete()
     }
