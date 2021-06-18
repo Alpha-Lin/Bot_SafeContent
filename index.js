@@ -7,15 +7,6 @@ const client = new Discord.Client();
 
 const blacklist = JSON.parse(fs.readFileSync("blacklist_pictures.json"))
 
-function createEntryServer(servID){
-    blacklist[servID] = {"URL":[],"hash":[],"max_size":0}
-    fs.writeFileSync('blacklist_pictures.json', JSON.stringify(blacklist))
-}
-
-client.on('guildCreate', guild => {
-    createEntryServer(guild.id)
-})
-
 function urlify(url){//analyse toutes les URLs
     const res = []
     url.replace(/(https?:\/\/[^\s]+)/g, function(url){
@@ -24,12 +15,15 @@ function urlify(url){//analyse toutes les URLs
     return res
 }
 
+client.on('ready', () => {
+    for(guild of client.guilds.cache){ //vérifie que pour chaque serveur où le bot est présent, une entrée lui est associée
+        if(blacklist[guild[0]] === undefined)
+            blacklist[guild[0]] = {"URL":[],"hash":[],"max_size":0}
+    }
+})
+
 client.on('message', message => {
     const serverID = message.guild.id
-    
-    if(!(serverID in blacklist)){
-        createEntryServer(serverID)
-    }
 
     if(blacklist[serverID]["URL"].includes(...urlify(message.content))){//check 1 : URLs
         message.delete()
@@ -82,9 +76,9 @@ function downloadFile(url, message){//télécharge l'attachment
 client.on('messageReactionAdd', reaction => {
     if(reaction.message.member.hasPermission("MANAGE_MESSAGES") && reaction.emoji.name === "❌"){
         //ajout 1 : URLs
-        urlify(reaction.message.content).forEach(url => {
+        for(url of urlify(reaction.message.content)){
             downloadFile(url, reaction.message)
-        });
+        };
         //ajout 2 : hash et son URL
         if(reaction.message.attachments.size > 0){ 
             downloadFile(reaction.message.attachments.first().url, reaction.message)
